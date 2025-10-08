@@ -50,13 +50,22 @@ export default {
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          muted: "hsl(var(--sidebar-muted))",
           accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
         },
+        stat: {
+          purple: "hsl(var(--stat-purple))",
+          orange: "hsl(var(--stat-orange))",
+          cyan: "hsl(var(--stat-cyan))",
+          green: "hsl(var(--stat-green))",
+        },
+        chart: {
+          income: "hsl(var(--chart-income))",
+          expense: "hsl(var(--chart-expense))",
+        },
+      },
+      boxShadow: {
+        'card': 'var(--shadow-card)',
       },
       borderRadius: {
         lg: "var(--radius)",
