@@ -1,20 +1,22 @@
-import { Home, Receipt, BarChart3, Clock, Settings, HelpCircle } from "lucide-react";
+import { Home, Receipt, BarChart3, Clock, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 interface SidebarProps {
   activeSection?: string;
 }
 
 const Sidebar = ({ activeSection = "dashboard" }: SidebarProps) => {
+  const navigate = useNavigate();
+
   const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: Home },
-    { id: "transactions", label: "Transactions", icon: Receipt },
-    { id: "analytics", label: "Analytics", icon: BarChart3 },
-    { id: "history", label: "History", icon: Clock },
+    { id: "dashboard", label: "Dashboard", icon: Home, path: "/" },
+    { id: "transactions", label: "Transactions", icon: Receipt, path: "/transactions" },
+    { id: "analytics", label: "Analytics", icon: BarChart3, path: "/analytics" },
+    { id: "history", label: "History", icon: Clock, path: "/history" },
   ];
 
   const generalItems = [
-    { id: "settings", label: "Settings", icon: Settings },
     { id: "help", label: "Help Center", icon: HelpCircle },
   ];
 
@@ -31,6 +33,7 @@ const Sidebar = ({ activeSection = "dashboard" }: SidebarProps) => {
             {navItems.map((item) => (
               <li key={item.id}>
                 <button
+                  onClick={() => navigate(item.path)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
                     "hover:bg-sidebar-muted",

@@ -32,7 +32,7 @@ const AssetsChart = () => {
           <YAxis 
             stroke="hsl(var(--muted-foreground))"
             style={{ fontSize: '12px' }}
-            tickFormatter={(value) => `$${value}`}
+            tickFormatter={(value) => `₹${value}`}
           />
           <Tooltip 
             contentStyle={{
