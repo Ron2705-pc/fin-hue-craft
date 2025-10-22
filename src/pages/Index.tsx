@@ -1,10 +1,59 @@
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import StatCard from "@/components/StatCard";
 import AssetsChart from "@/components/AssetsChart";
 import TransactionsTable from "@/components/TransactionsTable";
 import { Search, Bell, Settings } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
+  const [stats, setStats] = useState({
+    totalIncome: 0,
+    totalSpending: 0,
+    spendingGoal: 0,
+    totalTransactions: 0,
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: transactions } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id);
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (transactions) {
+        const income = transactions
+          .filter(t => t.type === 'income')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+        
+        const spending = transactions
+          .filter(t => t.type === 'expense')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+
+        setStats({
+          totalIncome: income,
+          totalSpending: spending,
+          spendingGoal: Number(profile?.spending_goal || 0),
+          totalTransactions: transactions.length,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar activeSection="dashboard" />
@@ -44,30 +93,30 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard
               title="Total Income"
-              amount="₹8500"
-              change="38%"
-              changeText="Increased form last month"
+              amount={`₹${stats.totalIncome.toLocaleString()}`}
+              change="--"
+              changeText="From all time"
               accentColor="purple"
             />
             <StatCard
               title="Total Spending"
-              amount="₹3500"
-              change="75%"
-              changeText="Increased form last month"
+              amount={`₹${stats.totalSpending.toLocaleString()}`}
+              change="--"
+              changeText="From all time"
               accentColor="orange"
             />
             <StatCard
               title="Spending Goal"
-              amount="₹9254"
-              change="18%"
-              changeText="Increased form last month"
+              amount={`₹${stats.spendingGoal.toLocaleString()}`}
+              change="--"
+              changeText="Current goal"
               accentColor="cyan"
             />
             <StatCard
               title="Total Transactions"
-              amount="₹17000"
-              change="88%"
-              changeText="Increased form last month"
+              amount={stats.totalTransactions.toString()}
+              change="--"
+              changeText="All transactions"
               accentColor="green"
             />
           </div>

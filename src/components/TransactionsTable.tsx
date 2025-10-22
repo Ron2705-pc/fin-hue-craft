@@ -1,33 +1,76 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, ArrowUpRight } from "lucide-react";
 import AddExpenseModal from "./modals/AddExpenseModal";
 import AddBudgetModal from "./modals/AddBudgetModal";
 import AddIncomeModal from "./modals/AddIncomeModal";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Transaction {
   id: string;
-  title: string;
+  description: string | null;
   date: string;
-  time: string;
-  medium: string;
   category: string;
-  amount: string;
+  amount: number;
   type: "income" | "expense";
 }
 
-const transactions: Transaction[] = [
-  { id: "1", title: "Grocery Shopping", date: "22 Sep", time: "10:AM", medium: "Visa", category: "Food & Dining", amount: "65,022", type: "expense" },
-  { id: "2", title: "Freelance Payment", date: "21 Sep", time: "10:AM", medium: "Paypal", category: "Income", amount: "65,022", type: "income" },
-  { id: "3", title: "Subscription Service", date: "20 Sep", time: "10:AM", medium: "Payoneer", category: "Bills & Utilities", amount: "65,022", type: "expense" },
-  { id: "4", title: "Salary Deposit", date: "19 Sep", time: "10:AM", medium: "Visa", category: "Income", amount: "65,022", type: "income" },
-  { id: "5", title: "Online Purchase", date: "18 Sep", time: "10:AM", medium: "Payoneer", category: "Shopping", amount: "65,022", type: "expense" },
-];
-
 const TransactionsTable = () => {
+  const { toast } = useToast();
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [budgetModalOpen, setBudgetModalOpen] = useState(false);
   const [incomeModalOpen, setIncomeModalOpen] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const fetchTransactions = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      
+      const mappedTransactions: Transaction[] = (data || []).map(t => ({
+        id: t.id,
+        description: t.description,
+        date: t.date,
+        category: t.category,
+        amount: Number(t.amount),
+        type: t.type as "income" | "expense",
+      }));
+      
+      setTransactions(mappedTransactions);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load transactions",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleModalClose = (success: boolean) => {
+    setExpenseModalOpen(false);
+    setBudgetModalOpen(false);
+    setIncomeModalOpen(false);
+    if (success) {
+      fetchTransactions();
+    }
+  };
 
   return (
     <div className="bg-card rounded-xl p-6 shadow-card">
@@ -61,54 +104,62 @@ const TransactionsTable = () => {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Title</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Medium</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Category</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((transaction) => (
-              <tr key={transaction.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                <td className="py-4 px-4">
-                  <span className="text-sm font-medium text-foreground">{transaction.title}</span>
-                </td>
-                <td className="py-4 px-4">
-                  <span className="text-sm text-muted-foreground">{transaction.date} - {transaction.time}</span>
-                </td>
-                <td className="py-4 px-4">
-                  <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                    transaction.medium === "Visa" ? "bg-stat-purple/10 text-stat-purple" :
-                    transaction.medium === "Paypal" ? "bg-stat-cyan/10 text-stat-cyan" :
-                    "bg-stat-orange/10 text-stat-orange"
-                  }`}>
-                    {transaction.medium}
-                  </span>
-                </td>
-                <td className="py-4 px-4">
-                  <span className="text-sm text-muted-foreground">{transaction.category}</span>
-                </td>
-                <td className="py-4 px-4 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="text-sm font-semibold text-foreground">₹{transaction.amount}</span>
-                    <ArrowUpRight className={`w-4 h-4 ${
-                      transaction.type === "income" ? "text-stat-green" : "text-stat-orange"
-                    }`} />
-                  </div>
-                </td>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground">Loading transactions...</p>
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground">No transactions yet. Add your first transaction above.</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Title</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Category</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {transactions.map((transaction) => {
+                const date = new Date(transaction.date);
+                const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const formattedTime = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                
+                return (
+                  <tr key={transaction.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                    <td className="py-4 px-4">
+                      <span className="text-sm font-medium text-foreground">{transaction.description || 'No description'}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-sm text-muted-foreground">{formattedDate} - {formattedTime}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary`}>
+                        {transaction.category}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="text-sm font-semibold text-foreground">₹{Number(transaction.amount).toLocaleString()}</span>
+                        <ArrowUpRight className={`w-4 h-4 ${
+                          transaction.type === "income" ? "text-stat-green" : "text-stat-orange"
+                        }`} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      <AddExpenseModal open={expenseModalOpen} onOpenChange={setExpenseModalOpen} />
-      <AddBudgetModal open={budgetModalOpen} onOpenChange={setBudgetModalOpen} />
-      <AddIncomeModal open={incomeModalOpen} onOpenChange={setIncomeModalOpen} />
+      <AddExpenseModal open={expenseModalOpen} onOpenChange={(open) => !open && handleModalClose(false)} />
+      <AddBudgetModal open={budgetModalOpen} onOpenChange={(open) => !open && handleModalClose(false)} />
+      <AddIncomeModal open={incomeModalOpen} onOpenChange={(open) => !open && handleModalClose(false)} />
     </div>
   );
 };

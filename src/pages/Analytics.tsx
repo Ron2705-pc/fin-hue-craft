@@ -1,34 +1,89 @@
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import { Search, Bell, Settings } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
-const incomeExpenseData = [
-  { month: "Jan", income: 8500, expense: 3200 },
-  { month: "Feb", income: 9200, expense: 3800 },
-  { month: "Mar", income: 8800, expense: 4200 },
-  { month: "Apr", income: 10500, expense: 3800 },
-  { month: "May", income: 11200, expense: 4500 },
-  { month: "Jun", income: 9800, expense: 4200 },
-];
+interface MonthlyData {
+  month: string;
+  income: number;
+  expense: number;
+}
 
-const categoryData = [
-  { name: "Food & Dining", value: 1200, color: "hsl(var(--stat-orange))" },
-  { name: "Shopping", value: 800, color: "hsl(var(--stat-purple))" },
-  { name: "Transportation", value: 500, color: "hsl(var(--stat-cyan))" },
-  { name: "Bills & Utilities", value: 700, color: "hsl(var(--stat-green))" },
-  { name: "Entertainment", value: 300, color: "hsl(var(--primary))" },
-];
-
-const monthlyTrendData = [
-  { month: "Jan", income: 8500, expense: 3200 },
-  { month: "Feb", income: 9200, expense: 3800 },
-  { month: "Mar", income: 8800, expense: 4200 },
-  { month: "Apr", income: 10500, expense: 3800 },
-  { month: "May", income: 11200, expense: 4500 },
-  { month: "Jun", income: 9800, expense: 4200 },
-];
+interface CategoryData {
+  name: string;
+  value: number;
+  color: string;
+}
 
 const Analytics = () => {
+  const { toast } = useToast();
+  const [incomeExpenseData, setIncomeExpenseData] = useState<MonthlyData[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, []);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: transactions, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+
+      // Process data for monthly income vs expense
+      const monthlyMap: { [key: string]: { income: number; expense: number } } = {};
+      const categoryMap: { [key: string]: number } = {};
+
+      transactions?.forEach((transaction) => {
+        const date = new Date(transaction.date);
+        const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
+        
+        if (!monthlyMap[monthKey]) {
+          monthlyMap[monthKey] = { income: 0, expense: 0 };
+        }
+
+        if (transaction.type === 'income') {
+          monthlyMap[monthKey].income += Number(transaction.amount);
+        } else {
+          monthlyMap[monthKey].expense += Number(transaction.amount);
+          categoryMap[transaction.category] = (categoryMap[transaction.category] || 0) + Number(transaction.amount);
+        }
+      });
+
+      const monthlyData: MonthlyData[] = Object.entries(monthlyMap).map(([month, data]) => ({
+        month,
+        ...data,
+      }));
+
+      const colors = ["hsl(var(--stat-orange))", "hsl(var(--stat-purple))", "hsl(var(--stat-cyan))", "hsl(var(--stat-green))", "hsl(var(--primary))"];
+      const categoryDataArray: CategoryData[] = Object.entries(categoryMap).map(([name, value], index) => ({
+        name,
+        value,
+        color: colors[index % colors.length],
+      }));
+
+      setIncomeExpenseData(monthlyData);
+      setCategoryData(categoryDataArray);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load analytics data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar activeSection="analytics" />
@@ -65,6 +120,16 @@ const Analytics = () => {
 
         {/* Main Content */}
         <div className="p-6 space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">Loading analytics...</p>
+            </div>
+          ) : incomeExpenseData.length === 0 ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">No transaction data available. Add some transactions to see analytics.</p>
+            </div>
+          ) : (
+            <>
           {/* Income vs Expense Line Chart */}
           <div className="bg-card rounded-xl p-6 shadow-card">
             <h2 className="text-lg font-semibold text-foreground mb-6">Income vs Expense</h2>
@@ -139,7 +204,7 @@ const Analytics = () => {
             <div className="bg-card rounded-xl p-6 shadow-card">
               <h2 className="text-lg font-semibold text-foreground mb-6">Monthly Trend</h2>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyTrendData}>
+                <BarChart data={incomeExpenseData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis 
                     dataKey="month" 
@@ -166,6 +231,8 @@ const Analytics = () => {
               </ResponsiveContainer>
             </div>
           </div>
+          </>
+          )}
         </div>
       </main>
     </div>
